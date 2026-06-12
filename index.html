@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absensi Mandiri - Klinik Vidya Medika</title>
+  <!-- FAVICON: Menggunakan format link Google Drive (lh3) yang didukung penuh oleh browser untuk ikon tab -->
+  <link rel="shortcut icon" type="image/x-icon" href="https://lh3.googleusercontent.com/d/1omWFD_6K3N0wW7P2oEw40FDsG89e-gMg">
+  <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1omWFD_6K3N0wW7P2oEw40FDsG89e-gMg">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & Lucide Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #f4f6f8;
+    }
+    .brand-green-bg {
+      background-color: #009639;
+    }
+    .brand-green-text {
+      color: #009639;
+    }
+    .brand-green-border {
+      border-color: #009639;
+    }
+    .brand-dark {
+      color: #1f2937;
+    }
+    /* Animasi pulsa kustom untuk indikator GPS */
+    @keyframes pulse-soft {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .6; transform: scale(1.05); }
+    }
+    .pulse-gps {
+      animation: pulse-soft 2s infinite ease-in-out;
+    }
+    
+    /* Aturan Cetak Khusus Multi-Tab */
+    @media print {
+      body {
+        background-color: #ffffff;
+      }
+      body * {
+        visibility: hidden;
+      }
+      /* PERBAIKAN: Gunakan selector class agar kedua area cetak harian maupun bulanan diakomodasi */
+      .printable-area, .printable-area * {
+        visibility: visible;
+      }
+      .printable-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      @page {
+        size: landscape;
+        margin: 1cm;
+      }
+      .matrix-scroll-wrapper {
+        overflow-x: visible !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-gray-800">
+
+  <!-- HEADER UTAMA -->
+  <header class="bg-white shadow-sm border-b border-gray-100 no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex justify-between items-center">
+      <!-- LOGO ASLI DARI GOOGLE DRIVE -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchPage('home')">
+        <img src="https://lh3.googleusercontent.com/d/1omWFD_6K3N0wW7P2oEw40FDsG89e-gMg" 
+             onerror="handleLogoError(this)" 
+             class="w-12 h-12 object-contain" alt="Logo">
+        <!-- Tampilan Fallback jika gambar di atas gagal dimuat/belum dikonfigurasi -->
+        <div class="logo-fallback hidden w-12 h-12 rounded-xl bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center text-emerald-700 font-black text-xl">
+          VM
+        </div>
+        <div>
+          <div class="flex items-center">
+            <h1 class="text-xl font-extrabold tracking-tight brand-dark">KLINIK VIDYA MEDIKA</h1>
+            <span class="text-xl font-extrabold text-emerald-600 ml-1">+</span>
+          </div>
+          <p class="text-xs font-semibold brand-green-text tracking-widest uppercase">Jl. Kaum Selatan No. 57, Pasirtalaga, Telagasari, Karawang 41381</p>
+        </div>
+      </div>
+
+      <!-- NAVIGASI / TOMBOL ADMIN -->
+      <div class="flex space-x-2">
+        <button id="btn-nav-home" onclick="switchPage('home')" class="brand-green-bg text-white px-4 py-2 rounded-xl font-semibold shadow-md transition duration-200 hover:bg-emerald-700 flex items-center gap-1.5 text-sm">
+          <i data-lucide="clock" class="w-4 h-4"></i> ABSEN
+        </button>
+        <button id="btn-nav-admin" onclick="openPinModal()" class="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-xl font-semibold transition duration-200 flex items-center gap-1.5 text-sm">
+          <i data-lucide="lock" class="w-4 h-4"></i> ADMIN
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- KONTEN UTAMA -->
+  <main class="flex-grow max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full flex items-center justify-center">
+
+    <!-- PAGE 1: HALAMAN DEPAN (ABSEN MANDIRI) -->
+    <section id="page-home" class="w-full max-w-xl bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8 space-y-6">
+      
+      <!-- Widget Waktu Aktual -->
+      <div class="text-center space-y-1 py-4 bg-emerald-50 rounded-2xl border border-emerald-100/50">
+        <div id="live-time" class="text-4xl md:text-5xl font-black brand-green-text tracking-wide">00:00:00</div>
+        <div id="live-date" class="text-sm font-semibold text-gray-500 tracking-wider uppercase">Hari, Tanggal Bulan Tahun</div>
+      </div>
+
+      <!-- Indikator Geotagging GPS -->
+      <div id="gps-indicator" class="flex items-center justify-center space-x-2.5 py-2.5 px-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold">
+        <span class="relative flex h-3.5 w-3.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500"></span>
+        </span>
+        <span id="gps-status" class="pulse-gps">Menunggu Izin Lokasi/GPS Hack...</span>
+      </div>
+
+      <!-- Form Absen -->
+      <div class="space-y-4">
+        <div>
+          <label for="employee-select" class="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+            <i data-lucide="user" class="w-4 h-4 brand-green-text"></i> Pilih Nama Anda
+          </label>
+          <div class="relative">
+            <select id="employee-select" class="block w-full rounded-xl border-2 border-gray-200 py-3.5 px-4 bg-gray-50 focus:border-emerald-500 focus:bg-white focus:outline-none transition duration-200 font-medium text-gray-800 appearance-none">
+              <option value="" disabled selected>-- Cari & Pilih Nama Pegawai --</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+              <i data-lucide="chevron-down" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <!-- Ditampilkan Jabatan sekaligus Unit di bawahnya -->
+          <p id="employee-jabatan" class="mt-2 text-xs text-gray-500 font-medium italic hidden bg-gray-50 border border-gray-100 p-2.5 rounded-xl"></p>
+        </div>
+
+        <!-- Shift Selector Container (Muncul secara interaktif setelah memilih nama) -->
+        <div id="shift-selection-container" class="hidden space-y-2.5 bg-emerald-50/20 p-4 rounded-2xl border border-emerald-100/50 transition-all duration-300">
+          <label for="shift-select" class="block text-sm font-bold text-gray-700 flex items-center gap-1">
+            <i data-lucide="pocket" class="w-4 h-4 brand-green-text"></i> Pilih Shift Kerja Hari Ini
+          </label>
+          <div class="relative">
+            <select id="shift-select" class="block w-full rounded-xl border-2 border-emerald-100 py-3 px-4 bg-white focus:border-emerald-500 focus:outline-none transition duration-200 font-bold text-gray-800 appearance-none text-sm">
+              <!-- Opsi shift dari LocalStorage terisi otomatis -->
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+              <i data-lucide="chevron-down" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <p id="shift-info-display" class="text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1">
+            <i data-lucide="info" class="w-3.5 h-3.5"></i> Jam Batas Shift: <span id="shift-hours-text">-</span>
+          </p>
+        </div>
+
+        <!-- Tombol Aksi Absen -->
+        <div class="grid grid-cols-2 gap-4 pt-2">
+          <button id="btn-absen-datang" onclick="executeAbsen('Datang')" class="brand-green-bg text-white py-4 px-6 rounded-2xl font-bold text-lg shadow-lg shadow-emerald-700/20 hover:bg-emerald-700 active:scale-95 transition duration-150 flex flex-col items-center justify-center gap-1">
+            <i data-lucide="log-in" class="w-7 h-7"></i>
+            <span>Absen Datang</span>
+          </button>
+          <button id="btn-absen-pulang" onclick="executeAbsen('Pulang')" class="bg-gray-800 text-white py-4 px-6 rounded-2xl font-bold text-lg shadow-lg shadow-gray-800/20 hover:bg-gray-900 active:scale-95 transition duration-150 flex flex-col items-center justify-center gap-1">
+            <i data-lucide="log-out" class="w-7 h-7"></i>
+            <span>Absen Pulang</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 2: DASHBOARD ADMIN & REKAP -->
+    <section id="page-dashboard" class="w-full hidden space-y-6">
+      
+      <!-- Top Actions Bar -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 no-print">
+        <div>
+          <h2 class="text-2xl font-black tracking-tight text-gray-900 flex items-center gap-2">
+            <i data-lucide="layout-dashboard" class="brand-green-text"></i> Rekapitulasi Real-Time Kehadiran
+          </h2>
+          <p class="text-sm text-gray-500 font-medium">Sistem Database Terintegrasi Klinik Vidya Medika.</p>
+        </div>
+        
+        <!-- Dashboard Toolbar -->
+        <div class="flex flex-wrap gap-2">
+          <button onclick="refreshDashboard()" class="bg-white border-2 border-emerald-500 text-emerald-700 hover:bg-emerald-50 px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Sinkron Data Seketika
+          </button>
+          <button onclick="printActiveTab()" class="brand-green-bg hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-1.5 shadow-md">
+            <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan
+          </button>
+          <button onclick="logoutDashboard()" class="bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-1.5">
+            <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB SELECTION NAVIGATION -->
+      <div class="flex border-b border-gray-200 no-print overflow-x-auto space-x-1">
+        <button onclick="setDashboardTab('log')" id="tab-log" class="py-3 px-5 font-bold text-sm border-b-2 border-emerald-500 text-emerald-600 transition flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="clipboard-list" class="w-4.5 h-4.5"></i> Log Kehadiran Harian
+        </button>
+        <button onclick="setDashboardTab('monthly')" id="tab-monthly" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300 transition flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="calendar" class="w-4.5 h-4.5"></i> Rekap Bulanan (Landscape)
+        </button>
+        <button onclick="setDashboardTab('manual')" id="tab-manual" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300 transition flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="user-plus" class="w-4.5 h-4.5"></i> Input Absen Manual
+        </button>
+        <button onclick="setDashboardTab('settings')" id="tab-settings" class="py-3 px-5 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300 transition flex items-center gap-2 whitespace-nowrap">
+          <i data-lucide="settings" class="w-4.5 h-4.5"></i> Pengaturan Shift
+        </button>
+      </div>
+
+      <!-- KARTU STATISTIK RINGKAS -->
+      <div id="stats-container" class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex items-center space-x-4">
+          <div class="p-3 bg-emerald-50 rounded-xl brand-green-text">
+            <i data-lucide="users" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Kehadiran Hari Ini</p>
+            <p id="stat-total-hari-ini" class="text-3xl font-extrabold text-gray-800">0</p>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex items-center space-x-4">
+          <div class="p-3 bg-blue-50 rounded-xl text-blue-600">
+            <i data-lucide="log-in" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Absen Datang</p>
+            <p id="stat-total-datang" class="text-3xl font-extrabold text-gray-800">0</p>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex items-center space-x-4">
+          <div class="p-3 bg-amber-50 rounded-xl text-amber-600">
+            <i data-lucide="log-out" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Absen Pulang</p>
+            <p id="stat-total-pulang" class="text-3xl font-extrabold text-gray-800">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2A: LOG KEHADIRAN HARIAN -->
+      <div id="dash-section-log" class="space-y-6">
+        <div id="print-area" class="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden printable-area">
+          
+          <!-- Header Dokumen Cetak (Hanya muncul saat dicetak) -->
+          <div class="hidden print:flex items-center justify-between border-b-2 border-gray-200 pb-5 p-6 mb-6">
+            <div class="flex items-center space-x-4">
+              <img src="https://lh3.googleusercontent.com/d/1omWFD_6K3N0wW7P2oEw40FDsG89e-gMg" 
+                   onerror="handleLogoError(this)" 
+                   class="w-16 h-16 object-contain" alt="Logo">
+              <div class="logo-fallback hidden w-16 h-16 rounded-xl bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center text-emerald-700 font-black text-2xl">
+                VM
+              </div>
+              <div>
+                <div class="flex items-center">
+                  <h1 class="text-2xl font-black text-gray-900 tracking-wide">KLINIK VIDYA MEDIKA</h1>
+                  <span class="text-2xl font-black text-emerald-600 ml-1">+</span>
+                </div>
+                <p class="text-sm font-semibold brand-green-text uppercase">Laporan Kehadiran Mandiri Pegawai</p>
+                <p class="text-xs text-gray-500">Sistem Database Terintegrasi Google Sheets</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-semibold" id="print-date">Tanggal Cetak: -</p>
+              <p class="text-xs text-gray-500">Sifat: Dokumen Klinik</p>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-center no-print bg-gray-50/50">
+            <h3 class="font-bold text-gray-800 text-lg flex items-center gap-1.5">
+              <i data-lucide="list-filter" class="w-5 h-5 brand-green-text"></i> Filter Log Harian
+            </h3>
+            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <input type="date" id="filter-tanggal" class="bg-white border-2 border-gray-200 rounded-xl px-4 py-2 font-semibold focus:border-emerald-500 focus:outline-none text-sm transition" onchange="applyFilters()">
+              <select id="filter-tipe" class="bg-white border-2 border-gray-200 rounded-xl px-4 py-2 font-semibold focus:border-emerald-500 focus:outline-none text-sm transition" onchange="applyFilters()">
+                <option value="">-- Semua Tipe Absen --</option>
+                <option value="Datang">Datang Only</option>
+                <option value="Pulang">Pulang Only</option>
+                <option value="Sakit">Sakit Only</option>
+                <option value="Cuti">Cuti Only</option>
+                <option value="Izin">Izin Only</option>
+                <option value="Alpa">Alpa Only</option>
+              </select>
+              <button onclick="clearFilters()" class="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition px-3 py-2">
+                Reset Filter
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabel Rekapitulasi -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-gray-100 brand-green-bg text-white font-bold text-sm">
+                  <th class="py-4 px-6">Tanggal & Waktu</th>
+                  <th class="py-4 px-6">Nama Pegawai & Unit</th>
+                  <th class="py-4 px-6">Jabatan</th>
+                  <th class="py-4 px-6 text-center">Tipe Absen / Shift</th>
+                  <th class="py-4 px-6 text-center">Keterangan Status</th>
+                  <th class="py-4 px-6">Koordinat Lokasi</th>
+                  <!-- PEMBAHARUAN: Menambahkan kolom "Aksi" untuk Koreksi Manual/Hapus oleh Admin -->
+                  <th class="py-4 px-6 text-center no-print">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-table-body" class="divide-y divide-gray-100 text-sm font-medium">
+                <!-- Loading State -->
+                <tr>
+                  <td colspan="7" class="py-12 text-center text-gray-500">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent mb-2"></div>
+                    <p class="font-semibold text-gray-600">Menghubungkan ke Google Sheets...</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2B: REKAP BULANAN LANDSCAPE -->
+      <div id="dash-section-monthly" class="hidden space-y-6">
+        <!-- PERBAIKAN: Ditambahkan class printable-area agar mendukung cetak window.print() -->
+        <div id="monthly-print-area" class="bg-white rounded-3xl border border-gray-100 shadow-xl p-6 space-y-6 printable-area">
+          
+          <!-- Dokumen Header Cetak Bulanan (Hanya muncul saat dicetak) -->
+          <div class="hidden print:flex items-center justify-between border-b-2 border-gray-200 pb-5 mb-6">
+            <div class="flex items-center space-x-4">
+              <!-- Ganti ID_FILE_LOGO_DRIVE_ANDA dengan ID file gambar logo Anda di Google Drive -->
+              <img src="https://lh3.googleusercontent.com/d/1omWFD_6K3N0wW7P2oEw40FDsG89e-gMg" 
+                   onerror="handleLogoError(this)" 
+                   class="w-16 h-16 object-contain" alt="Logo">
+              <div class="logo-fallback hidden w-16 h-16 rounded-xl bg-emerald-50 border-2 border-emerald-500 flex items-center justify-center text-emerald-700 font-black text-2xl">
+                VM
+              </div>
+              <div>
+                <div class="flex items-center">
+                  <h1 class="text-2xl font-black text-gray-900 tracking-wide">KLINIK VIDYA MEDIKA</h1>
+                  <span class="text-2xl font-black text-emerald-600 ml-1">+</span>
+                </div>
+                <p class="text-sm font-semibold brand-green-text uppercase">Laporan Bulanan Kehadiran Pegawai</p>
+                <p class="text-xs text-gray-500">Sistem Database Terintegrasi Google Sheets</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-semibold" id="monthly-print-info">Bulan: -</p>
+              <p class="text-xs text-gray-500">Sifat: Rahasia/Klinik</p>
+            </div>
+          </div>
+
+          <!-- Filter Pemilihan Bulan & Tahun -->
+          <div class="flex flex-col sm:flex-row gap-4 items-center justify-between no-print bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+            <h3 class="font-bold text-gray-800 text-base flex items-center gap-1.5">
+              <i data-lucide="calendar" class="w-5 h-5 brand-green-text"></i> Pilih Periode Laporan
+            </h3>
+            <div class="flex gap-2 w-full sm:w-auto">
+              <select id="monthly-select-month" class="bg-white border-2 border-gray-200 rounded-xl px-4 py-2 font-bold focus:border-emerald-500 focus:outline-none text-sm transition" onchange="renderMonthlyMatrix()">
+                <option value="1">Januari</option>
+                <option value="2">Februari</option>
+                <option value="3">Maret</option>
+                <option value="4">April</option>
+                <option value="5">Mei</option>
+                <option value="6">Juni</option>
+                <option value="7">Juli</option>
+                <option value="8">Agustus</option>
+                <option value="9">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+              </select>
+              <select id="monthly-select-year" class="bg-white border-2 border-gray-200 rounded-xl px-4 py-2 font-bold focus:border-emerald-500 focus:outline-none text-sm transition" onchange="renderMonthlyMatrix()">
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Container Grid Matriks yang Bergulir (Landscape) -->
+          <div class="matrix-scroll-wrapper overflow-x-auto border border-gray-100 rounded-2xl">
+            <table class="w-full text-left border-collapse text-xs table-fixed min-w-[1100px]">
+              <thead>
+                <tr id="matrix-header-row" class="brand-green-bg text-white font-bold border-b border-emerald-700">
+                  <th class="p-3 w-44 sticky left-0 brand-green-bg z-10 border-r border-emerald-700">Nama Pegawai</th>
+                  <!-- Generator Tanggal 1-31 diinjeksikan disini -->
+                </tr>
+              </thead>
+              <tbody id="matrix-table-body" class="divide-y divide-gray-100 font-semibold bg-white">
+                <!-- Data Pegawai Terpilih diinjeksikan disini -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Legenda Matriks Absen -->
+          <div class="p-4 bg-gray-50 rounded-2xl border border-gray-150 grid grid-cols-2 md:grid-cols-7 gap-3 text-xs font-bold">
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold">H</span> Tepat Waktu</div>
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold">T</span> Terlambat</div>
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-gray-500 text-white flex items-center justify-center font-bold">P</span> Pulang Cepat</div>
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center font-bold">S</span> Sakit</div>
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold">C</span> Cuti</div>
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-violet-500 text-white flex items-center justify-center font-bold">I</span> Izin</div>
+            <div class="flex items-center gap-1.5"><span class="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold">A</span> Alpa / Absen</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2C: INPUT ABSEN MANUAL -->
+      <div id="dash-section-manual" class="hidden max-w-xl mx-auto">
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-xl p-6 md:p-8 space-y-6">
+          <div class="text-center space-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+              <i data-lucide="user-plus" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">Catat Absensi Manual Pegawai</h3>
+            <p class="text-xs text-gray-500 font-medium">Gunakan fitur ini untuk mengisi kehadiran pegawai yang Cuti, Sakit, Izin, atau Alpa.</p>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Pilih Pegawai -->
+            <div>
+              <label for="manual-employee" class="block text-sm font-bold text-gray-700 mb-1.5">Pilih Pegawai</label>
+              <select id="manual-employee" class="block w-full rounded-xl border-2 border-gray-200 py-3 px-4 bg-gray-50 focus:border-emerald-500 focus:bg-white focus:outline-none transition font-semibold text-gray-800">
+                <!-- Dropdown otomatis -->
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <!-- Pilih Status Kehadiran -->
+              <div>
+                <label for="manual-status" class="block text-sm font-bold text-gray-700 mb-1.5">Status Kehadiran</label>
+                <select id="manual-status" class="block w-full rounded-xl border-2 border-gray-200 py-3 px-4 bg-gray-50 focus:border-emerald-500 focus:bg-white focus:outline-none transition font-semibold text-gray-800">
+                  <option value="Sakit">Sakit (S)</option>
+                  <option value="Cuti">Cuti (C)</option>
+                  <option value="Izin">Izin (I)</option>
+                  <option value="Alpa">Alpa (A)</option>
+                </select>
+              </div>
+
+              <!-- Pilih Tanggal -->
+              <div>
+                <label for="manual-date" class="block text-sm font-bold text-gray-700 mb-1.5">Tanggal Absen</label>
+                <input type="date" id="manual-date" class="block w-full rounded-xl border-2 border-gray-200 py-2.5 px-4 bg-gray-50 focus:border-emerald-500 focus:bg-white focus:outline-none transition font-semibold text-gray-800">
+              </div>
+            </div>
+
+            <!-- Kolom Keterangan -->
+            <div>
+              <label for="manual-desc" class="block text-sm font-bold text-gray-700 mb-1.5">Keterangan / Alasan Resmi</label>
+              <textarea id="manual-desc" rows="3" placeholder="Contoh: Sakit demam dengan surat keterangan dokter, Cuti tahunan, dll." class="block w-full rounded-xl border-2 border-gray-200 py-3 px-4 bg-gray-50 focus:border-emerald-500 focus:bg-white focus:outline-none transition font-semibold text-gray-800 text-sm"></textarea>
+            </div>
+
+            <!-- Tombol Eksekusi -->
+            <button onclick="executeManualAbsen()" class="w-full brand-green-bg hover:bg-emerald-700 text-white py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-md">
+              <i data-lucide="check-square" class="w-5 h-5"></i> Simpan Data Absensi
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2D: PENGATURAN JAM BATAS WAKTU (9 SHIFT KERJA) -->
+      <div id="dash-section-settings" class="hidden max-w-xl mx-auto">
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-xl p-6 md:p-8 space-y-6">
+          <div class="text-center space-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+              <i data-lucide="settings" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">Pengaturan Batas Toleransi Jam Shift</h3>
+            <p class="text-xs text-gray-500 font-medium">Sesuaikan batas jam masuk dan pulang kerja untuk setiap shift pelayanan klinik.</p>
+          </div>
+
+          <!-- Input dinamis untuk 9 Shift Kerja secara terstruktur -->
+          <div class="space-y-4">
+            <div class="overflow-y-auto max-h-[350px] space-y-3 pr-1" id="shifts-settings-grid">
+              <!-- Baris edit shift akan digenerate otomatis lewat Javascript -->
+            </div>
+
+            <!-- Tombol Simpan Semua Shift -->
+            <button onclick="saveTimeLimits()" class="w-full brand-green-bg hover:bg-emerald-700 text-white py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-1.5 shadow-md">
+              <i data-lucide="save" class="w-5 h-5"></i> Perbarui Semua Jam Shift
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- MODAL 1: LOGIN PIN ADMIN -->
+  <div id="pin-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm mx-4 shadow-2xl border border-gray-100 space-y-6 transform scale-95 transition-all duration-200">
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+          <i data-lucide="shield-alert" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800">Otorisasi Dashboard</h3>
+        <p class="text-xs text-gray-500 font-medium leading-relaxed">Masukkan kode PIN khusus Admin untuk dapat mengakses rekapitulasi data absensi Klinik.</p>
+      </div>
+      
+      <div class="space-y-4">
+        <input type="password" id="admin-pin-input" placeholder="Masukkan PIN" class="block w-full text-center tracking-widest text-2xl font-black rounded-xl border-2 border-gray-200 py-3 focus:border-emerald-500 focus:outline-none transition">
+        <p id="pin-error-msg" class="text-xs text-rose-600 font-bold text-center hidden flex items-center justify-center gap-1">
+          <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> PIN yang Anda masukkan salah!
+        </p>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="closePinModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold transition text-sm">
+            Batal
+          </button>
+          <button onclick="submitAdminPin()" class="w-full brand-green-bg hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition text-sm flex items-center justify-center gap-1.5 shadow-md">
+            <i data-lucide="unlock" class="w-4 h-4"></i> Buka Akses
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: NOTIFIKASI SUKSES/GAGAL -->
+  <div id="alert-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm mx-4 shadow-2xl border border-gray-100 text-center space-y-6 transform scale-95 transition-all duration-200">
+      <div id="alert-icon-container" class="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto">
+        <!-- Dinamis -->
+      </div>
+      <div class="space-y-1">
+        <h3 id="alert-title" class="text-xl font-extrabold text-gray-800">Status Absen</h3>
+        <p id="alert-message" class="text-sm text-gray-500 leading-relaxed font-medium">Keterangan hasil proses disini.</p>
+      </div>
+      <button onclick="closeAlertModal()" class="w-full brand-green-bg hover:bg-emerald-700 text-white py-3.5 rounded-xl font-bold transition shadow-md">
+        Mengerti
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL 3: KONFIRMASI HAPUS DATA SECARA MANDIRI (KOREKSI MANUAL) -->
+  <div id="confirm-delete-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-3xl p-6 md:p-8 w-full max-w-sm mx-4 shadow-2xl border border-gray-100 text-center space-y-6 transform scale-95 transition-all duration-200">
+      <div class="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+        <i data-lucide="trash-2" class="w-10 h-10"></i>
+      </div>
+      <div class="space-y-1">
+        <h3 class="text-xl font-extrabold text-gray-800">Hapus Data Absen?</h3>
+        <p id="confirm-delete-message" class="text-sm text-gray-500 leading-relaxed font-medium">Apakah Anda yakin ingin menghapus data absensi ini secara permanen?</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="closeConfirmDeleteModal()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-bold transition text-sm">
+          Batal
+        </button>
+        <button onclick="executeDeleteRecord()" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-xl font-bold transition text-sm flex items-center justify-center gap-1.5 shadow-md">
+          <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADER SPINNER LAYAR PENUH -->
+  <div id="screen-loader" class="fixed inset-0 bg-white/80 backdrop-blur-md z-50 flex flex-col items-center justify-center hidden">
+    <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent mb-4"></div>
+    <p id="loader-text" class="font-bold text-gray-700 tracking-wide">Memproses Transaksi...</p>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-gray-100 py-4 no-print text-center text-xs font-semibold text-gray-400">
+    &copy; 2026 Klinik Vidya Medika. All Rights Reserved. Sistem Absensi Mandiri Terintegrasi.
+  </footer>
+
+  <!-- SCRIPT LOGIKA UTAMA -->
+  <script>
+    // Koordinat Referensi Klinik Vidya Medika (Geofencing)
+    const CLINIC_LAT = -6.292255409673662;
+    const CLINIC_LNG = 107.38412045416194;
+    
+    // PEMBAHARUAN: Batas maksimal radius ditingkatkan menjadi 1.000.000 meter (1.000 km)
+    const MAX_RADIUS_METERS = 1000000;
+
+    // PEMBAHARUAN: Jam Kerja Standar Baru untuk 9 Shift Kerja Pelayanan Klinik
+    const defaultShifts = {
+      "Shift Pagi Umum": { masuk: "07:00", pulang: "19:00" },
+      "Shift Malam Umum": { masuk: "19:00", pulang: "07:00" },
+      "Shift Pagi Ranap": { masuk: "07:00", pulang: "14:00" },
+      "Shift Siang Ranap": { masuk: "14:00", pulang: "21:00" },
+      "Shift Malam Ranap": { masuk: "21:00", pulang: "07:00" },
+      "Shift Kebersihan": { masuk: "07:00", pulang: "18:00" },
+      "Shift Lab/Office": { masuk: "07:00", pulang: "17:00" },
+      "Shift Pagi UGD": { masuk: "08:00", pulang: "20:00" },
+      "Shift Malam UGD": { masuk: "20:00", pulang: "08:00" }
+    };
+
+    let currentLatitude = 0;
+    let currentLongitude = 0;
+    let activeEmployees = [];
+    let rawAttendanceRecords = [];
+    let syncTimeout = null;
+    let activeDashboardTab = 'log'; // Tab aktif default di admin
+    let currentServerToday = ""; // Menyimpan tanggal hari ini dari server spreadsheet
+    let deleteTargetTimestamp = ""; // ID Target Unik Hapus Kehadiran
+    let deleteTargetEmpId = "";
+
+    /**
+     * AMBIL DAN VALIDASI SHIFTS DARI LOCAL STORAGE (PRODUKSI KUAT / SELF-HEALING)
+     */
+    function getShiftsConfig() {
+      try {
+        let stored = localStorage.getItem('VM_SHIFTS_CONFIG');
+        if (stored) {
+          let parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            // Evaluasi paksa jika shift baru seperti "Shift Pagi UGD" belum ada di penyimpanan lokal, lakukan reset otomatis
+            if (!parsed["Shift Pagi UGD"]) {
+              localStorage.setItem('VM_SHIFTS_CONFIG', JSON.stringify(defaultShifts));
+              return defaultShifts;
+            }
+            
+            let valid = true;
+            Object.keys(parsed).forEach(k => {
+              if (!parsed[k] || typeof parsed[k] !== 'object' || !parsed[k].masuk || !parsed[k].pulang) {
+                valid = false;
+              }
+            });
+            if (valid) return parsed;
+          }
+        }
+      } catch (e) {
+        console.error("Gagal melakukan parse VM_SHIFTS_CONFIG, me-restorasi data default.", e);
+      }
+      // Jika data rusak atau belum ada, set ulang dengan konfigurasi default asli
+      localStorage.setItem('VM_SHIFTS_CONFIG', JSON.stringify(defaultShifts));
+      return defaultShifts;
+    }
+
+    // Inisialisasi awal struktur shift secara aman
+    getShiftsConfig();
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      updateClock();
+      setInterval(updateClock, 1000);
+      initGeotagging();
+      fetchEmployees();
+      
+      // Inisialisasi form tanggal manual ke hari ini
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('manual-date').value = today;
+
+      // Inisialisasi Tampilan Settings Shift & Form dropdown harian
+      loadShiftsSettingsUI();
+      populateShiftSelect();
+
+      // Inisialisasi pilihan bulan dan tahun rekap
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+      document.getElementById('monthly-select-month').value = currentMonth;
+      document.getElementById('monthly-select-year').value = currentYear;
+    });
+
+    /**
+     * KALKULASI JARAK DENGAN FORMULA HAVERSINE (PRESISI TINGGI)
+     */
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // Radius Bumi dalam satuan meter
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // Hasil akhir dalam meter
+    }
+
+    /**
+     * SINKRONISASI WAKUAL (Jam & Hari)
+     */
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const formattedDate = now.toLocaleDateString('id-ID', options);
+      
+      document.getElementById('live-time').textContent = `${hours}:${minutes}:${seconds}`;
+      document.getElementById('live-date').textContent = formattedDate;
+    }
+
+    /**
+     * GEOTAGGING OTOMATIS
+     */
+    function initGeotagging() {
+      const gpsStatus = document.getElementById('gps-status');
+      const gpsIndicator = document.getElementById('gps-indicator');
+
+      if (!navigator.geolocation) {
+        gpsStatus.textContent = "GPS tidak didukung oleh browser Anda.";
+        gpsIndicator.className = "flex items-center justify-center space-x-2.5 py-2.5 px-4 bg-rose-50 rounded-xl border border-rose-200 text-rose-800 text-xs font-semibold";
+        return;
+      }
+
+      function successGeo(position) {
+        currentLatitude = position.coords.latitude;
+        currentLongitude = position.coords.longitude;
+        
+        // Hitung jarak real-time dari posisi ke Klinik
+        const distance = getDistance(currentLatitude, currentLongitude, CLINIC_LAT, CLINIC_LNG);
+        const roundedDistance = Math.round(distance);
+        
+        if (distance <= MAX_RADIUS_METERS) {
+          gpsStatus.textContent = `GPS Aktif - Dalam Jangkauan (${roundedDistance}m dari Klinik)`;
+          gpsIndicator.className = "flex items-center justify-center space-x-2.5 py-2.5 px-4 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-xs font-semibold";
+        } else {
+          gpsStatus.textContent = `GPS Aktif - Di Luar Jangkauan (${roundedDistance}m dari Klinik, Batas: 1000km)`;
+          gpsIndicator.className = "flex items-center justify-center space-x-2.5 py-2.5 px-4 bg-rose-50 rounded-xl border border-rose-200 text-rose-800 text-xs font-semibold";
+        }
+      }
+
+      function errorGeo(err) {
+        let msg = "Izinkan akses GPS untuk absensi presisi.";
+        if (err.code === 1) msg = "Akses GPS ditolak! Harap izinkan lokasi pada browser.";
+        else if (err.code === 2) msg = "Lokasi tidak dapat dideteksi.";
+        else if (err.code === 3) msg = "Waktu tunggu deteksi GPS habis.";
+        
+        gpsStatus.textContent = msg;
+        gpsIndicator.className = "flex items-center justify-center space-x-2.5 py-2.5 px-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold";
+      }
+
+      const geoOptions = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      navigator.geolocation.getCurrentPosition(successGeo, errorGeo, geoOptions);
+      navigator.geolocation.watchPosition(successGeo, errorGeo, geoOptions);
+    }
+
+    /**
+     * TARIK KARYAWAN DARI GOOGLE SCRIPT
+     */
+    function fetchEmployees() {
+      showLoader("Memuat data karyawan...");
+      google.script.run
+        .withSuccessHandler((employees) => {
+          activeEmployees = employees || [];
+          const select = document.getElementById('employee-select');
+          const selectManual = document.getElementById('manual-employee');
+          
+          select.innerHTML = '<option value="" disabled selected>-- Cari & Pilih Nama Pegawai --</option>';
+          selectManual.innerHTML = '';
+          
+          activeEmployees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = `${emp.id} - ${emp.nama}`;
+            select.appendChild(opt);
+
+            const optManual = document.createElement('option');
+            optManual.value = emp.id;
+            optManual.textContent = `${emp.id} - ${emp.nama} (${emp.jabatan})`;
+            selectManual.appendChild(optManual);
+          });
+          
+          select.onchange = () => {
+            const selectedVal = select.value;
+            const match = activeEmployees.find(e => e.id === selectedVal);
+            const jbtText = document.getElementById('employee-jabatan');
+            const shiftContainer = document.getElementById('shift-selection-container');
+            
+            if (match) {
+              jbtText.innerHTML = `
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div><span class="font-extrabold text-gray-700">Jabatan:</span> <span class="font-bold text-gray-900">${match.jabatan}</span></div>
+                  <div class="sm:border-l sm:border-gray-300 sm:pl-3"><span class="font-extrabold text-gray-700">Unit:</span> <span class="font-bold text-emerald-700">${match.unit || "-"}</span></div>
+                </div>
+              `;
+              jbtText.classList.remove('hidden');
+              shiftContainer.classList.remove('hidden'); 
+            } else {
+              jbtText.classList.add('hidden');
+              shiftContainer.classList.add('hidden');
+            }
+          };
+          hideLoader();
+        })
+        .withFailureHandler((err) => {
+          hideLoader();
+          showAlert("Koneksi Gagal", "Gagal memuat daftar pegawai: " + err.message, false);
+        })
+        .getActiveEmployees();
+    }
+
+    /**
+     * EKSEKUSI ABSENSI MANDIRI (DATANG / PULANG) DENGAN VALIDASI SENSITIF JARAK & SHIFT
+     */
+    function executeAbsen(type) {
+      const select = document.getElementById('employee-select');
+      const employeeId = select.value;
+      const selectedShift = document.getElementById('shift-select').value;
+
+      if (!employeeId) {
+        showAlert("Peringatan", "Harap pilih nama Anda terlebih dahulu sebelum absensi!", false);
+        return;
+      }
+
+      if (currentLatitude === 0 || currentLongitude === 0) {
+        showAlert("Akses Lokasi Diperlukan", "GPS Anda belum terdeteksi. Silakan aktifkan GPS dan izinkan lokasi.", false);
+        return;
+      }
+
+      // VALIDASI BATAS LOKASI KUNCI JANGKAUAN 1000 KM
+      const distance = getDistance(currentLatitude, currentLongitude, CLINIC_LAT, CLINIC_LNG);
+      if (distance > MAX_RADIUS_METERS) {
+        showAlert(
+          "Absen Ditolak (Di Luar Jangkauan)", 
+          `Batas maksimal absensi adalah <b>1000 kilometer</b> dari Klinik Vidya Medika.<br><br>Anda saat ini terdeteksi berada sejauh <b>${Math.round(distance / 1000)} kilometer</b> dari klinik. Silakan mendekat ke lokasi klinik untuk melakukan absensi.`, 
+          false
+        );
+        return;
+      }
+
+      showLoader(`Pencatatan Absen ${type}...`);
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          hideLoader();
+          if (result && result.success) {
+            const statusEvaluated = evaluateTimeStatus(type, result.data.waktu, selectedShift);
+            let evaluationMsg = "";
+            if (statusEvaluated === "Terlambat") {
+              evaluationMsg = "<br><span class='text-rose-600 font-bold'>⚠️ Catatan: Anda datang terlambat untuk shift ini.</span>";
+            } else if (statusEvaluated === "Pulang Cepat") {
+              evaluationMsg = "<br><span class='text-amber-600 font-bold'>⚠️ Catatan: Anda pulang mendahului jam pulang shift ini.</span>";
+            } else {
+              evaluationMsg = "<br><span class='text-emerald-600 font-bold'>✨ Catatan: Tepat waktu. Terima kasih!</span>";
+            }
+
+            showAlert(
+              "Absen Berhasil!", 
+              `Halo <b>${result.data.nama}</b>,<br>Absen <b>${type}</b> [${selectedShift}] berhasil dicatat pada jam <b>${result.data.waktu} WIB</b>.${evaluationMsg}`, 
+              true
+            );
+            
+            select.value = "";
+            document.getElementById('employee-jabatan').classList.add('hidden');
+            document.getElementById('shift-selection-container').classList.add('hidden');
+          } else {
+            showAlert("Absen Gagal", result ? result.message : "Gagal memproses", false);
+          }
+        })
+        .withFailureHandler((err) => {
+          hideLoader();
+          showAlert("Sistem Error", "Koneksi terganggu: " + err.message, false);
+        })
+        .recordAttendance(employeeId, type, currentLatitude, currentLongitude, selectedShift);
+    }
+
+    /**
+     * EVALUASI STATUS KETEPATAN WAKTU ABSENSI BERDASARKAN SHIFT TERPILIH
+     */
+    function evaluateTimeStatus(tipeAbsen, jamAbsenStr, shiftName) {
+      if (!jamAbsenStr || jamAbsenStr === "-") return "-";
+      
+      const cleanTipe = tipeAbsen.trim().toLowerCase();
+      if (cleanTipe !== "datang" && cleanTipe !== "pulang") {
+        return tipeAbsen; // Sakit, Cuti, Izin, Alpa
+      }
+
+      const shiftsConfig = getShiftsConfig();
+      const activeShift = shiftName || "Shift Pagi Umum";
+      
+      // Amankan pembacaan properti dari undefined
+      const config = shiftsConfig[activeShift] || shiftsConfig["Shift Pagi Umum"] || { masuk: "07:00", pulang: "19:00" };
+
+      const limitMasuk = config.masuk + (config.masuk.split(':').length === 2 ? ":00" : "");
+      const limitPulang = config.pulang + (config.pulang.split(':').length === 2 ? ":00" : "");
+
+      const toSeconds = (tStr) => {
+        const p = tStr.split(':');
+        return parseInt(p[0], 10) * 3600 + parseInt(p[1], 10) * 60 + (p[2] ? parseInt(p[2], 10) : 0);
+      };
+
+      const absSec = toSeconds(jamAbsenStr);
+      
+      if (cleanTipe === "datang") {
+        const limitSec = toSeconds(limitMasuk);
+        return absSec > limitSec ? "Terlambat" : "Tepat Waktu";
+      } else {
+        const limitSec = toSeconds(limitPulang);
+        return absSec < limitSec ? "Pulang Cepat" : "Tepat Waktu";
+      }
+    }
+
+    /**
+     * GENERATOR ANTARMUKA EDIT SHIFT DI MENU ADMIN SETTINGS (PRODUKSI KUAT)
+     */
+    function loadShiftsSettingsUI() {
+      const container = document.getElementById('shifts-settings-grid');
+      if (!container) return;
+      
+      const shiftsConfig = getShiftsConfig();
+      container.innerHTML = "";
+      
+      Object.keys(shiftsConfig).forEach((shiftName) => {
+        const shiftData = shiftsConfig[shiftName] || { masuk: "07:00", pulang: "19:00" };
+        const card = document.createElement('div');
+        card.className = "p-3 bg-gray-50 rounded-2xl border border-gray-150 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm";
+        card.innerHTML = `
+          <div class="font-bold text-gray-800 sm:w-5/12 flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full brand-green-bg"></span>
+            ${shiftName}
+          </div>
+          <div class="flex items-center gap-2 sm:w-7/12">
+            <div class="flex-1">
+              <label class="text-[9px] text-gray-400 font-bold block uppercase tracking-wider">Jam Masuk</label>
+              <input type="time" data-shift="${shiftName}" data-type="masuk" value="${shiftData.masuk || '07:00'}" class="w-full bg-white border border-gray-200 rounded-xl p-2 text-center font-extrabold text-gray-800 focus:outline-none focus:border-emerald-500 text-xs">
+            </div>
+            <div class="flex-1">
+              <label class="text-[9px] text-gray-400 font-bold block uppercase tracking-wider">Jam Pulang</label>
+              <input type="time" data-shift="${shiftName}" data-type="pulang" value="${shiftData.pulang || '19:00'}" class="w-full bg-white border border-gray-200 rounded-xl p-2 text-center font-extrabold text-gray-800 focus:outline-none focus:border-emerald-500 text-xs">
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    /**
+     * POPULASI DROPDOWN PILIHAN SHIFT PADA SCREEN DEPAN
+     */
+    function populateShiftSelect() {
+      const shiftSelect = document.getElementById('shift-select');
+      if (!shiftSelect) return;
+      
+      const shiftsConfig = getShiftsConfig();
+      shiftSelect.innerHTML = "";
+      
+      Object.keys(shiftsConfig).forEach((shiftName, idx) => {
+        const opt = document.createElement('option');
+        opt.value = shiftName;
+        opt.textContent = shiftName;
+        if (idx === 0) opt.selected = true;
+        shiftSelect.appendChild(opt);
+      });
+      
+      // Sinkronisasi info jam kerja saat dropdown berubah
+      shiftSelect.onchange = () => {
+        const val = shiftSelect.value;
+        const config = shiftsConfig[val];
+        if (config) {
+          document.getElementById('shift-hours-text').textContent = `${config.masuk} WIB s/d ${config.pulang} WIB`;
+        }
+      };
+      
+      // Muat info jam kerja awal
+      if (shiftSelect.value) {
+        const config = shiftsConfig[shiftSelect.value];
+        if (config) {
+          document.getElementById('shift-hours-text').textContent = `${config.masuk} WIB s/d ${config.pulang} WIB`;
+        }
+      }
+    }
+
+    /**
+     * SIMPAN PENGATURAN SEMUA JAM SHIFT DI TAB ADMIN
+     */
+    function saveTimeLimits() {
+      const container = document.getElementById('shifts-settings-grid');
+      if (!container) return;
+      
+      const inputs = container.querySelectorAll('input[type="time"]');
+      const shiftsConfig = {};
+      
+      inputs.forEach(input => {
+        const shiftName = input.getAttribute('data-shift');
+        const type = input.getAttribute('data-type');
+        
+        if (!shiftsConfig[shiftName]) {
+          shiftsConfig[shiftName] = {};
+        }
+        shiftsConfig[shiftName][type] = input.value;
+      });
+
+      localStorage.setItem('VM_SHIFTS_CONFIG', JSON.stringify(shiftsConfig));
+      populateShiftSelect(); // Sinkronisasikan juga dropdown depan harian seketika
+      
+      showAlert("Pengaturan Diperbarui", "Batas waktu toleransi seluruh jenis Shift berhasil diperbarui di database browser.", true);
+    }
+
+    /**
+     * EKSEKUSI ABSEN MANUAL OLEH ADMIN
+     */
+    function executeManualAbsen() {
+      const employeeId = document.getElementById('manual-employee').value;
+      const status = document.getElementById('manual-status').value;
+      const date = document.getElementById('manual-date').value; 
+      const desc = document.getElementById('manual-desc').value;
+
+      if (!employeeId || !status || !date) {
+        showAlert("Data Kurang Lengkap", "Mohon isi nama pegawai, tipe absensi manual, dan tanggal absensi.", false);
+        return;
+      }
+
+      showLoader("Menulis data absen manual...");
+
+      const dateParts = date.split('-');
+      const formattedDateInput = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+      // Default shift untuk input manual non-kehadiran
+      const defaultManualShift = "Shift Pagi Umum";
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          hideLoader();
+          if (result && result.success) {
+            showAlert("Berhasil Disimpan", `Absensi manual [${status}] untuk pegawai terpilih berhasil dicatatkan di database.`, true);
+            document.getElementById('manual-desc').value = ""; 
+            refreshDashboard(); 
+          } else {
+            showAlert("Gagal Menyimpan", result ? result.message : "Terjadi kesalahan internal", false);
+          }
+        })
+        .withFailureHandler((err) => {
+          hideLoader();
+          showAlert("Sistem Error", "Gagal menyimpan data manual ke Spreadsheet: " + err.message, false);
+        })
+        .recordAttendance(employeeId, status + " (Manual: " + desc + ")", "-", "-", defaultManualShift);
+    }
+
+    /**
+     * MANAJEMEN MENU TAB DASHBOARD ADMIN
+     */
+    function setDashboardTab(tabId) {
+      activeDashboardTab = tabId;
+
+      const tabs = ['log', 'monthly', 'manual', 'settings'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const sect = document.getElementById(`dash-section-${t}`);
+        
+        if (t === tabId) {
+          btn.className = "py-3 px-5 font-bold text-sm border-b-2 border-emerald-500 text-emerald-600 transition flex items-center gap-2 whitespace-nowrap";
+          sect.classList.remove('hidden');
+        } else {
+          btn.className = "py-3 px-5 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-emerald-600 hover:border-emerald-300 transition flex items-center gap-2 whitespace-nowrap";
+          sect.classList.add('hidden');
+        }
+      });
+
+      const statsContainer = document.getElementById('stats-container');
+      if (tabId === 'log' || tabId === 'monthly') {
+        statsContainer.classList.remove('hidden');
+      } else {
+        statsContainer.classList.add('hidden');
+      }
+
+      if (tabId === 'settings') {
+        loadShiftsSettingsUI(); // Muat data jam terkini ke UI Admin Settings
+      } else if (tabId === 'monthly') {
+        renderMonthlyMatrix();
+      }
+    }
+
+    /**
+     * HALAMAN NAVIGATION
+     */
+    function switchPage(page) {
+      const pageHome = document.getElementById('page-home');
+      const pageDashboard = document.getElementById('page-dashboard');
+      const btnHome = document.getElementById('btn-nav-home');
+      const btnAdmin = document.getElementById('btn-nav-admin');
+
+      if (page === 'home') {
+        pageHome.classList.remove('hidden');
+        pageDashboard.classList.add('hidden');
+        
+        btnHome.className = "brand-green-bg text-white px-4 py-2 rounded-xl font-semibold shadow-md transition duration-200 hover:bg-emerald-700 flex items-center gap-1.5 text-sm";
+        btnAdmin.className = "bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-xl font-semibold transition duration-200 flex items-center gap-1.5 text-sm";
+        populateShiftSelect(); // Pastikan list shift harian ter-update jika admin habis mengeditnya
+      } else if (page === 'dashboard') {
+        pageHome.classList.add('hidden');
+        pageDashboard.classList.remove('hidden');
+        
+        btnHome.className = "bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-xl font-semibold transition duration-200 flex items-center gap-1.5 text-sm";
+        btnAdmin.className = "brand-green-bg text-white px-4 py-2 rounded-xl font-semibold shadow-md transition duration-200 hover:bg-emerald-700 flex items-center gap-1.5 text-sm";
+        
+        refreshDashboard();
+      }
+    }
+
+    /**
+     * VERIFIKASI PIN ADMIN
+     */
+    function openPinModal() {
+      document.getElementById('admin-pin-input').value = "";
+      document.getElementById('pin-error-msg').classList.add('hidden');
+      document.getElementById('pin-modal').classList.remove('hidden');
+    }
+
+    function closePinModal() {
+      document.getElementById('pin-modal').classList.add('hidden');
+    }
+
+    /**
+     * VERIFIKASI PIN ADMIN
+     */
+    function submitAdminPin() {
+      const pin = document.getElementById('admin-pin-input').value;
+      if (!pin) return;
+
+      showLoader("Mengonfirmasi PIN...");
+      google.script.run
+        .withSuccessHandler((isValid) => {
+          hideLoader();
+          if (isValid) {
+            closePinModal();
+            switchPage('dashboard');
+          } else {
+            document.getElementById('pin-error-msg').classList.remove('hidden');
+          }
+        })
+        .withFailureHandler((err) => {
+          hideLoader();
+          showAlert("Otorisasi Gagal", "Gagal memproses PIN: " + err.message, false);
+        })
+        .verifyAdminPin(pin);
+    }
+
+    /**
+     * PENORMALISASI TANGGAL KE FORMAT DD-MM-YYYY (ANTI-BUG)
+     */
+    function normalizeToDDMMYYYY(dateStr) {
+      if (!dateStr) return "";
+      dateStr = dateStr.toString().trim().replace(/^'/, "");
+
+      // 1. Jika format sudah dd-mm-yyyy (e.g. 11-06-2026)
+      if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+        return dateStr;
+      }
+
+      // 2. Jika format adalah yyyy-mm-dd (e.g. 2026-06-11)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const parts = dateStr.split('-');
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+
+      // 3. Jika menggunakan garis miring / (e.g. 11/06/2026 atau 2026/06/11)
+      if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          if (parts[0].length === 4) { // yyyy/mm/dd
+            return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
+          } else { // dd/mm/yyyy
+            return `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+          }
+        }
+      }
+
+      // 4. Jika bertipe ISO String
+      if (dateStr.includes('T')) {
+        const datePart = dateStr.split('T')[0];
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+          return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+
+      return dateStr;
+    }
+
+    /**
+     * TAMPILAN TANGGAL INDONESIA YANG PREMIUM (e.g. 11 Juni 2026)
+     */
+    function formatToIndonesianDate(dateValue) {
+      const normalized = normalizeToDDMMYYYY(dateValue);
+      if (!/^\d{2}-\d{2}-\d{4}$/.test(normalized)) return dateValue || "-";
+      
+      const parts = normalized.split('-');
+      const months = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+      const day = parseInt(parts[0], 10);
+      const month = months[parseInt(parts[1], 10) - 1];
+      const year = parts[2];
+      return `${day} ${month} ${year}`;
+    }
+
+    /**
+     * SINKRONISASI DATA DAN PENAMPILAN INSTANT KE TABEL
+     */
+    function refreshDashboard() {
+      const tbody = document.getElementById('attendance-table-body');
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="py-12 text-center text-gray-500">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent mb-3"></div>
+            <p class="font-bold text-gray-700 tracking-wide text-sm">Menghubungkan & Mensinkronisasikan Spreadsheet...</p>
+            <p id="sync-latency-warning" class="text-xs text-amber-600 mt-2 font-medium hidden">
+              ⚠️ Memerlukan waktu respons ekstra. Pastikan SPREADSHEET_ID sudah disesuaikan pada baris paling atas Code.gs jika ini script mandiri.
+            </p>
+          </td>
+        </tr>
+      `;
+
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => {
+        const warning = document.getElementById('sync-latency-warning');
+        if (warning) warning.classList.remove('hidden');
+      }, 5000); 
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          if (syncTimeout) clearTimeout(syncTimeout);
+          try {
+            // Perbaikan GAS serialization: ubah objek dictionary jika diterima ke array murni harian
+            let dataRecords = result.records || [];
+            if (dataRecords && typeof dataRecords === 'object' && !Array.isArray(dataRecords)) {
+              dataRecords = Object.keys(dataRecords)
+                .sort((a,b) => parseInt(a,10) - parseInt(b,10))
+                .map(k => dataRecords[k]);
+            }
+
+            currentServerToday = result.today || ""; 
+            
+            // Konversikan semua tanggal dari database ke format seragam dd-mm-yyyy secara internal
+            rawAttendanceRecords = dataRecords.map(r => {
+              r.normalizedTanggal = normalizeToDDMMYYYY(r.tanggal);
+              return r;
+            });
+            
+            renderDashboardData(rawAttendanceRecords);
+            calculateStats(rawAttendanceRecords, currentServerToday);
+            
+            if (activeDashboardTab === 'monthly') {
+              renderMonthlyMatrix();
+            }
+            
+            document.getElementById('print-date').textContent = "Tanggal Cetak: " + new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + " WIB";
+          } catch (err) {
+            console.error(err);
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="6" class="py-12 text-center text-rose-600 font-bold">
+                  <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-2"></i>
+                  Gagal memproses struktur data: ${err.message}
+                </td>
+              </tr>
+            `;
+            lucide.createIcons();
+          }
+        })
+        .withFailureHandler((err) => {
+          if (syncTimeout) clearTimeout(syncTimeout);
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="py-12 text-center text-rose-600 font-bold">
+                <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-2"></i>
+                Koneksi Google Spreadsheet Terputus / Tidak Berfungsi.
+                <p class="text-xs text-gray-500 font-normal mt-1">Error: ${err.message}</p>
+              </td>
+            </tr>
+          `;
+          lucide.createIcons();
+        })
+        .getAttendanceData();
+    }
+
+    /**
+     * RENDER DATA KE DALAM TABEL LAPORAN REKAPITULASI
+     */
+    function renderDashboardData(records) {
+      const tbody = document.getElementById('attendance-table-body');
+      tbody.innerHTML = "";
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="py-12 text-center text-gray-400 font-bold">
+              <i data-lucide="folder-open" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
+              Tidak ada data riwayat absensi yang ditemukan.
+            </td>
+          </tr>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      records.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50/50 transition border-b border-gray-100";
+
+        const fullTipe = row.tipe ? row.tipe.toString().trim() : "-";
+        let displayTipe = "Datang";
+        let cleanDesc = "-";
+
+        if (fullTipe.toLowerCase().includes("manual")) {
+          const splitParts = fullTipe.split(" (Manual: ");
+          displayTipe = splitParts[0]; 
+          cleanDesc = splitParts[1] ? splitParts[1].replace(")", "") : "-";
+        } else if (fullTipe.toLowerCase() === 'pulang') {
+          displayTipe = "Pulang";
+        } else if (fullTipe.toLowerCase() === 'datang') {
+          displayTipe = "Datang";
+        } else {
+          displayTipe = fullTipe;
+        }
+
+        const timeStatus = evaluateTimeStatus(displayTipe, row.jam, row.shift);
+        let statusBadge = "";
+        
+        if (timeStatus === "Terlambat") {
+          statusBadge = `<span class="bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full text-xs font-bold border border-rose-200">Terlambat</span>`;
+        } else if (timeStatus === "Pulang Cepat") {
+          statusBadge = `<span class="bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full text-xs font-bold border border-amber-200">Pulang Cepat</span>`;
+        } else if (timeStatus === "Tepat Waktu") {
+          statusBadge = `<span class="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-bold border border-emerald-200">Tepat Waktu</span>`;
+        } else {
+          statusBadge = `<span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-bold border border-blue-200">${timeStatus}</span>`;
+        }
+
+        const isDatang = displayTipe.toLowerCase() === 'datang';
+        const isPulang = displayTipe.toLowerCase() === 'pulang';
+        
+        let badgeClass = "bg-gray-100 text-gray-800 border-gray-200";
+        if (isDatang) badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+        else if (isPulang) badgeClass = "bg-slate-100 text-slate-800 border-slate-200";
+        else badgeClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+        const mapLink = row.mapLink ? row.mapLink.toString().trim() : "-";
+        const locationCell = (mapLink !== "-" && mapLink.startsWith("http"))
+          ? `<a href="${mapLink}" target="_blank" class="brand-green-text hover:underline flex items-center gap-1 font-bold text-xs"><i data-lucide="map-pin" class="w-3.5 h-3.5"></i> Lihat Peta</a>`
+          : `<span class="text-gray-400">-</span>`;
+
+        const displayDate = formatToIndonesianDate(row.normalizedTanggal || row.tanggal);
+        const jamDisplay = row.jam ? row.jam.toString().trim() : "-";
+
+        // Tampilkan juga unit kerja dan shift secara intuitif di dalam sel yang pas, dan kolom "Aksi" kustom
+        tr.innerHTML = `
+          <td class="py-4 px-6">
+            <div class="font-bold text-gray-800">${displayDate}</div>
+            <div class="text-xs text-gray-500 font-medium">${jamDisplay} WIB</div>
+          </td>
+          <td class="py-4 px-6 font-bold text-gray-900">
+            <div>${row.nama || "-"}</div>
+            <div class="text-[10px] text-emerald-600 font-extrabold uppercase tracking-wide">Unit: ${row.unit || "-"}</div>
+          </td>
+          <td class="py-4 px-6 text-gray-600 font-medium">${row.jabatan || "-"}</td>
+          <td class="py-4 px-6 text-center">
+            <span class="px-3 py-1 rounded-full text-xs font-bold border ${badgeClass}">
+              ${displayTipe}
+            </span>
+            <div class="text-[9px] text-gray-400 font-extrabold mt-1.5 uppercase tracking-wider">${row.shift || "-"}</div>
+          </td>
+          <td class="py-4 px-6 text-center">
+            <div class="flex flex-col items-center gap-1">
+              ${statusBadge}
+              ${cleanDesc !== "-" ? `<span class="text-[10px] text-gray-400 italic max-w-[150px] truncate" title="${cleanDesc}">${cleanDesc}</span>` : ""}
+            </div>
+          </td>
+          <td class="py-4 px-6">${locationCell}</td>
+          <td class="py-4 px-6 text-center no-print">
+            <button onclick="confirmDeleteRecord('${row.timestamp}', '${row.idPegawai}', '${row.nama}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-extrabold inline-flex items-center gap-1 transition shadow-sm" title="Hapus & Koreksi Absen">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    /**
+     * MANAJEMEN MODAL DAN PROSES PENGHAPUSAN AMAN (KOREKSI MANUAL)
+     */
+    function confirmDeleteRecord(timestamp, idPegawai, nama) {
+      deleteTargetTimestamp = timestamp;
+      deleteTargetEmpId = idPegawai;
+      
+      document.getElementById('confirm-delete-message').innerHTML = `Apakah Anda yakin ingin menghapus & mengoreksi data absensi milik <b>${nama}</b>?<br><span class="text-xs text-rose-600 font-bold">Tindakan ini akan menghapus baris data secara permanen dari Google Sheets.</span>`;
+      document.getElementById('confirm-delete-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeConfirmDeleteModal() {
+      document.getElementById('confirm-delete-modal').classList.add('hidden');
+    }
+
+    function executeDeleteRecord() {
+      closeConfirmDeleteModal();
+      showLoader("Menghapus data absensi...");
+      
+      google.script.run
+        .withSuccessHandler((result) => {
+          hideLoader();
+          if (result && result.success) {
+            showAlert("Berhasil Dikoreksi", result.message, true);
+            refreshDashboard(); // Refresh table harian & matriks bulanan harian
+          } else {
+            showAlert("Gagal Koreksi", result ? result.message : "Terjadi kesalahan internal", false);
+          }
+        })
+        .withFailureHandler((err) => {
+          hideLoader();
+          showAlert("Sistem Error", "Koneksi Google Sheets terputus: " + err.message, false);
+        })
+        .deleteAttendanceRecord(deleteTargetTimestamp, deleteTargetEmpId);
+    }
+
+    /**
+     * MENGALUR GENERATOR TABEL MATRIKS REKAP BULANAN LANDSCAPE
+     */
+    function renderMonthlyMatrix() {
+      const selectedMonth = parseInt(document.getElementById('monthly-select-month').value, 10);
+      const selectedYear = parseInt(document.getElementById('monthly-select-year').value, 10);
+
+      const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+      
+      const monthNames = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+      document.getElementById('monthly-print-info').textContent = `Bulan: ${monthNames[selectedMonth - 1]} ${selectedYear}`;
+
+      const headerRow = document.getElementById('matrix-header-row');
+      headerRow.innerHTML = `<th class="p-3 w-44 sticky left-0 brand-green-bg z-10 border-r border-emerald-700">Nama Pegawai</th>`;
+      
+      for (let d = 1; d <= daysInMonth; d++) {
+        const th = document.createElement('th');
+        th.className = "p-1.5 text-center border-r border-emerald-700 w-9";
+        th.textContent = d;
+        headerRow.appendChild(th);
+      }
+      
+      const summaryHeaders = ['Hadir', 'Lambat', 'Sakit', 'Cuti', 'Izin', 'Alpa'];
+      summaryHeaders.forEach(sh => {
+        const th = document.createElement('th');
+        th.className = "p-2 text-center bg-emerald-800 border-r border-emerald-700 w-14";
+        th.textContent = sh; // DIKOREKSI: Menggunakan huruf kecil "sh" (sebelumnya Sh) untuk menghindari ReferenceError
+        headerRow.appendChild(th);
+      });
+
+      const tbody = document.getElementById('matrix-table-body');
+      tbody.innerHTML = "";
+
+      if (activeEmployees.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="${daysInMonth + 7}" class="py-8 text-center text-gray-400 font-bold">
+              Tidak ada data karyawan aktif.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      activeEmployees.forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50 border-b border-gray-100";
+
+        const nameTd = document.createElement('td');
+        nameTd.className = "p-3 sticky left-0 bg-white font-bold text-gray-900 border-r border-gray-200 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]";
+        nameTd.innerHTML = `
+          <div class="truncate max-w-[170px]" title="${emp.nama}">${emp.nama}</div>
+          <div class="text-[9px] text-gray-400 italic font-medium truncate max-w-[170px]">${emp.jabatan}</div>
+        `;
+        tr.appendChild(nameTd);
+
+        let countHadir = 0;
+        let countLambat = 0;
+        let countSakit = 0;
+        let countCuti = 0;
+        let countIzin = 0;
+        let countAlpa = 0;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const td = document.createElement('td');
+          td.className = "p-1 text-center border-r border-gray-100 w-9";
+
+          const sDay = String(d).padStart(2, '0');
+          const sMonth = String(selectedMonth).padStart(2, '0');
+          const targetDateStr = `${sDay}-${sMonth}-${selectedYear}`;
+
+          const matchedRecords = rawAttendanceRecords.filter(r => 
+            r.idPegawai.toString().trim() === emp.id.toString().trim() &&
+            r.normalizedTanggal === targetDateStr
+          );
+
+          let statusLetter = "-";
+          let badgeColor = "text-gray-300"; 
+
+          if (matchedRecords.length > 0) {
+            const manualRecord = matchedRecords.find(r => r.tipe.toLowerCase().includes("manual"));
+            const datangRecord = matchedRecords.find(r => r.tipe.toLowerCase() === "datang");
+            const pulangRecord = matchedRecords.find(r => r.tipe.toLowerCase() === "pulang");
+
+            if (manualRecord) {
+              const mType = manualRecord.tipe.toLowerCase();
+              if (mType.includes("sakit")) { statusLetter = "S"; badgeColor = "bg-sky-500 text-white"; countSakit++; }
+              else if (mType.includes("cuti")) { statusLetter = "C"; badgeColor = "bg-amber-500 text-white"; countCuti++; }
+              else if (mType.includes("izin")) { statusLetter = "I"; badgeColor = "bg-violet-500 text-white"; countIzin++; }
+              else if (mType.includes("alpa")) { statusLetter = "A"; badgeColor = "bg-orange-500 text-white"; countAlpa++; }
+            } else if (datangRecord) {
+              // Kalkulasi status keterlambatan dinamis menggunakan nama shift aslinya di record
+              const isLate = evaluateTimeStatus("Datang", datangRecord.jam, datangRecord.shift) === "Terlambat";
+              if (isLate) {
+                statusLetter = "T";
+                badgeColor = "bg-rose-500 text-white";
+                countLambat++;
+              } else {
+                statusLetter = "H";
+                badgeColor = "bg-emerald-500 text-white";
+                countHadir++;
+              }
+            } else if (pulangRecord) {
+              statusLetter = "P";
+              badgeColor = "bg-gray-500 text-white";
+            }
+          }
+
+          if (statusLetter !== "-") {
+            td.innerHTML = `<span class="w-5 h-5 rounded-full ${badgeColor} inline-flex items-center justify-center font-black text-[10px] tracking-tighter">${statusLetter}</span>`;
+          } else {
+            td.innerHTML = `<span class="text-gray-200">-</span>`;
+          }
+
+          tr.appendChild(td);
+        }
+
+        const buildSummaryTd = (val, colClass) => {
+          const td = document.createElement('td');
+          td.className = `p-2 text-center font-black border-r border-gray-100 w-14 ${colClass}`;
+          td.textContent = val;
+          return td;
+        };
+
+        tr.appendChild(buildSummaryTd(countHadir, 'text-emerald-600 bg-emerald-50/20'));
+        tr.appendChild(buildSummaryTd(countLambat, 'text-rose-600 bg-rose-50/20'));
+        tr.appendChild(buildSummaryTd(countSakit, 'text-sky-600 bg-sky-50/20'));
+        tr.appendChild(buildSummaryTd(countCuti, 'text-amber-600 bg-amber-50/20'));
+        tr.appendChild(buildSummaryTd(countIzin, 'text-violet-600 bg-violet-50/20'));
+        tr.appendChild(buildSummaryTd(countAlpa, 'text-orange-600 bg-orange-50/20'));
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * MENGALKULASI TOTAL REKAPAN METRIK ABSEN HARI INI (DIJAMIN WAKTU SERVER)
+     */
+    function calculateStats(records, serverToday) {
+      let todayFormatted = serverToday;
+      if (!todayFormatted) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const yyyy = now.getFullYear();
+        todayFormatted = `${dd}-${mm}-${yyyy}`; 
+      }
+      
+      todayFormatted = normalizeToDDMMYYYY(todayFormatted);
+      
+      const recordsToday = records.filter(r => {
+        if (!r.normalizedTanggal) return false;
+        return normalizeToDDMMYYYY(r.normalizedTanggal) === todayFormatted;
+      });
+      
+      const countDatang = recordsToday.filter(r => {
+        const tipe = r.tipe ? r.tipe.toString().trim().toLowerCase() : "";
+        return tipe === "datang" || tipe.startsWith("datang (manual") || tipe.startsWith("sakit") || tipe.startsWith("cuti") || tipe.startsWith("izin");
+      }).length;
+      
+      const countPulang = recordsToday.filter(r => {
+        const tipe = r.tipe ? r.tipe.toString().trim().toLowerCase() : "";
+        return tipe === "pulang" || tipe.startsWith("pulang (manual");
+      }).length;
+
+      document.getElementById('stat-total-hari-ini').textContent = recordsToday.length;
+      document.getElementById('stat-total-datang').textContent = countDatang;
+      document.getElementById('stat-total-pulang').textContent = countPulang;
+    }
+
+    /**
+     * CETAK LAPORAN BERDASARKAN TAB AKTIF
+     */
+    function printActiveTab() {
+      if (activeDashboardTab === 'monthly') {
+        window.print();
+      } else if (activeDashboardTab === 'log') {
+        window.print();
+      } else {
+        showAlert("Menu Tidak Dapat Dicetak", "Cetak laporan hanya tersedia untuk tab 'Log Kehadiran Harian' atau 'Rekap Bulanan'.", false);
+      }
+    }
+
+    /**
+     * PENYARINGAN FILTER LAPORAN LOG HARIAN
+     */
+    function applyFilters() {
+      const fTanggal = document.getElementById('filter-tanggal').value; 
+      const fTipe = document.getElementById('filter-tipe').value;
+
+      let filtered = [...rawAttendanceRecords];
+
+      if (fTanggal) {
+        const parts = fTanggal.split('-');
+        const filterFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; 
+        filtered = filtered.filter(r => r.normalizedTanggal === filterFormatted);
+      }
+
+      if (fTipe) {
+        filtered = filtered.filter(r => {
+          const tipe = r.tipe ? r.tipe.toString().trim().toLowerCase() : "";
+          return tipe.includes(fTipe.toLowerCase());
+        });
+      }
+
+      renderDashboardData(filtered);
+    }
+
+    function clearFilters() {
+      document.getElementById('filter-tanggal').value = "";
+      document.getElementById('filter-tipe').value = "";
+      renderDashboardData(rawAttendanceRecords);
+    }
+
+    function logoutDashboard() {
+      switchPage('home');
+    }
+
+    function showLoader(text) {
+      document.getElementById('loader-text').textContent = text;
+      document.getElementById('screen-loader').classList.remove('hidden');
+    }
+
+    function hideLoader() {
+      document.getElementById('screen-loader').classList.add('hidden');
+    }
+
+    function showAlert(title, message, isSuccess = true) {
+      const modal = document.getElementById('alert-modal');
+      const iconContainer = document.getElementById('alert-icon-container');
+      
+      document.getElementById('alert-title').textContent = title;
+      document.getElementById('alert-message').innerHTML = message;
+
+      if (isSuccess) {
+        iconContainer.className = "w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto";
+        iconContainer.innerHTML = '<i data-lucide="check-circle" class="w-10 h-10"></i>';
+      } else {
+        iconContainer.className = "w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto";
+        iconContainer.innerHTML = '<i data-lucide="alert-triangle" class="w-10 h-10"></i>';
+      }
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAlertModal() {
+      document.getElementById('alert-modal').classList.add('hidden');
+    }
+
+    /**
+     * SCRIPT PENANGANAN ERROR SINKRONISASI LOGO ASLI
+     */
+    function handleLogoError(img) {
+      img.style.display = 'none';
+      const fallback = img.nextElementSibling;
+      if (fallback && fallback.classList.contains('logo-fallback')) {
+        fallback.classList.remove('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
